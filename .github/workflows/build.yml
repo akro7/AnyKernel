@@ -1,0 +1,59 @@
+name: Build AnyKernel3 ZIP
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'boot.img'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Download AnyKernel3
+        run: |
+          wget -q https://github.com/osm0sis/AnyKernel3/archive/refs/heads/master.zip -O anykernel.zip
+          unzip -q anykernel.zip
+          mv AnyKernel3-master AnyKernel3
+
+      - name: Copy boot.img into AnyKernel3
+        run: |
+          cp boot.img AnyKernel3/boot.img
+
+      - name: Get date for zip name
+        id: date
+        run: echo "DATE=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+
+      - name: Create AnyKernel3 ZIP
+        run: |
+          cd AnyKernel3
+          zip -r9 ../AnyKernel3-${{ steps.date.outputs.DATE }}.zip . \
+            -x "*.git*" \
+            -x "README.md" \
+            -x "*.zip"
+
+      - name: Upload ZIP as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnyKernel3-${{ steps.date.outputs.DATE }}
+          path: AnyKernel3-${{ steps.date.outputs.DATE }}.zip
+          retention-days: 7
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: kernel-${{ steps.date.outputs.DATE }}
+          name: "Kernel ${{ steps.date.outputs.DATE }}"
+          files: AnyKernel3-${{ steps.date.outputs.DATE }}.zip
+          body: |
+            ## AnyKernel3 Flashable ZIP
+            Built automatically from boot.img
+            **Date:** ${{ steps.date.outputs.DATE }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
